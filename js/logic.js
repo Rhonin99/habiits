@@ -20,22 +20,44 @@ export function topLevel(s, groupId = 'all') {
 
 export const isParent = (s, h) => childrenOf(s, h.id).length > 0;
 
-export function periodRange(h, date, weekStart) {
-  if (h.period === 'week') {
+function rangeOf(period, date, weekStart) {
+  if (period === 'week') {
     const start = startOfWeek(date, weekStart);
     return [start, addDays(start, 6)];
   }
-  if (h.period === 'month') return [startOfMonth(date), endOfMonth(date)];
+  if (period === 'month') return [startOfMonth(date), endOfMonth(date)];
   return [date, date];
 }
 
-// Weekly/monthly habit with a "Mark done" button = check off once per day, count the days.
-export const isCheckIn = (h) => h.period !== 'day' && tapModeOf(h) === 'done';
+// Goal period: the window the goal value is measured over (day / week / month).
+export const periodRange = (h, date, weekStart) => rangeOf(h.period, date, weekStart);
 
-export const dayValue = (s, h, key) => {
-  const v = s.logs[h.id]?.[key] || 0;
-  return isCheckIn(h) ? (v > 0 ? 1 : 0) : v;
-};
+// Task days: when the habit is required.
+//  'every' | 'weekdays' (h.days) | 'monthDays' (h.monthDays)
+//  'perWeek' / 'perMonth' = meet the daily goal on h.perCount days of the week/month;
+//  the other days don't count for or against you.
+export const taskDaysOf = (h) => h.taskDays || 'every';
+export const isQuota = (h) => h.period === 'day' && (h.taskDays === 'perWeek' || h.taskDays === 'perMonth');
+export const quotaPeriod = (h) => (h.taskDays === 'perWeek' ? 'week' : 'month');
+
+// The window success is judged over: the goal period, or the week/month of a quota habit.
+export const cycleRange = (h, date, weekStart) => rangeOf(isQuota(h) ? quotaPeriod(h) : h.period, date, weekStart);
+
+export const dayValue = (s, h, key) => s.logs[h.id]?.[key] || 0;
+
+// Days in the week/month (up to today) on which the daily goal was met.
+export function quotaStatus(s, h, date) {
+  const [start, end] = cycleRange(h, date, s.settings.weekStart);
+  const last = minDate(end, today());
+  let met = 0;
+  for (let d = start; d <= last; d = addDays(d, 1)) {
+    if (!isActiveOn(h, d)) continue;
+    const v = dayValue(s, h, dkey(d));
+    if ((v > 0 || !hasMin(h)) && metGoal(h, v)) met++;
+  }
+  const need = Math.max(1, Math.round(h.perCount || 1));
+  return { met, need, done: met >= need };
+}
 
 // Sum of logged values from the start of the habit's period up to and including `date`.
 export function valueAsOf(s, h, date) {
@@ -52,8 +74,14 @@ export function isScheduled(s, h, date) {
   if (!isActiveOn(h, date)) return false;
   const kids = childrenOf(s, h.id);
   if (kids.length) return kids.some((k) => isScheduled(s, k, date));
-  if (h.period === 'day' && h.days && h.days.length && h.days.length < 7) {
-    return h.days.includes(date.getDay());
+  const td = taskDaysOf(h);
+  if (td === 'weekdays' && h.days?.length) return h.days.includes(date.getDay());
+  if (td === 'monthDays' && h.monthDays?.length) {
+    const dom = date.getDate();
+    if (h.monthDays.includes(dom)) return true;
+    // "the 31st" falls on the last day of shorter months
+    const lastDom = endOfMonth(date).getDate();
+    return dom === lastDom && h.monthDays.some((x) => x > lastDom);
   }
   return true;
 }
@@ -69,6 +97,8 @@ export function isDue(s, h, date) {
   if (isSkipped(s, h, date)) return false;
   const kids = childrenOf(s, h.id);
   if (kids.length) return kids.some((k) => isDue(s, k, date));
+  // a "3 days a week" habit only counts on the days you actually did it
+  if (isQuota(h)) return isScheduled(s, h, date) && status(s, h, date).done;
   return isScheduled(s, h, date);
 }
 
@@ -125,7 +155,16 @@ export function dayCompletion(s, date, groupId = 'all') {
   return { done, total: due.length, ratio: due.length ? done / due.length : 0 };
 }
 
-const effectivePeriod = (s, h) => (isParent(s, h) ? 'day' : h.period);
+// The period streaks and stats are counted in.
+export const cyclePeriod = (s, h) => (isParent(s, h) ? 'day' : isQuota(h) ? quotaPeriod(h) : h.period);
+const effectivePeriod = cyclePeriod;
+
+// Was the goal met for the week/month (or goal period) ending at `asOf`?
+function cycleResult(s, h, asOf) {
+  if (isQuota(h)) return { done: quotaStatus(s, h, asOf).done, over: false };
+  const st = status(s, h, asOf);
+  return { done: st.done, over: st.over };
+}
 
 // Chronological list of { end, done } periods from habit creation to today.
 function periodHistory(s, h) {
@@ -144,10 +183,9 @@ function periodHistory(s, h) {
   } else {
     let d = period === 'week' ? startOfWeek(created, s.settings.weekStart) : startOfMonth(created);
     while (d <= t) {
-      const [, end] = periodRange(h, d, s.settings.weekStart);
+      const [, end] = cycleRange(h, d, s.settings.weekStart);
       const asOf = minDate(end, t);
-      const st = status(s, h, asOf);
-      out.push({ end: asOf, done: st.done, over: st.over });
+      out.push({ end: asOf, ...cycleResult(s, h, asOf) });
       d = addDays(end, 1);
     }
   }
@@ -177,6 +215,11 @@ export function dayIntensity(s, h, date) {
   if (!isActiveOn(h, date) || date > today()) return null;
   if (isParent(s, h)) return isDue(s, h, date) ? status(s, h, date).ratio : null;
   const dv = dayValue(s, h, dkey(date));
+  if (isQuota(h)) {
+    const st = status(s, h, date);
+    if (st.over) return -1;
+    return dv > 0 ? Math.max(0.35, st.minRatio) : 0;
+  }
   if (h.period === 'day') {
     if (!isDue(s, h, date)) return null;
     const st = status(s, h, date);
@@ -214,11 +257,11 @@ export function monthStats(s, h, month) {
   } else {
     let d = period === 'week' ? startOfWeek(first, s.settings.weekStart) : first;
     while (d <= last) {
-      const [, end] = periodRange(h, d, s.settings.weekStart);
+      const [, end] = cycleRange(h, d, s.settings.weekStart);
       const asOf = minDate(end, t);
       if (isActiveOn(h, asOf)) {
         due++;
-        if (status(s, h, asOf).done) done++;
+        if (cycleResult(s, h, asOf).done) done++;
       }
       d = addDays(end, 1);
     }
@@ -241,7 +284,10 @@ export function weekStats(s, h, weekStart) {
     let st = 'off';
     if (d > t || !isActiveOn(h, d)) st = d > t ? 'future' : 'off';
     else if (isSkipped(s, h, d) && isScheduled(s, h, d)) { st = 'skip'; skipped++; }
-    else if (period === 'day' && isDue(s, h, d)) {
+    else if (isQuota(h)) {
+      const r = status(s, h, d);
+      st = r.done ? 'done' : dayValue(s, h, dkey(d)) > 0 ? 'logged' : 'off';
+    } else if (period === 'day' && isDue(s, h, d)) {
       const r = status(s, h, d);
       st = r.done ? 'done' : r.over ? 'over' : 'miss';
       due++;
@@ -250,17 +296,22 @@ export function weekStats(s, h, weekStart) {
     days.push(st);
   }
   if (period === 'week' && isActiveOn(h, minDate(addDays(weekStart, 6), t)) && weekStart <= t) {
-    const r = status(s, h, minDate(addDays(weekStart, 6), t));
     due = 1;
-    done = r.done ? 1 : 0;
+    done = cycleResult(s, h, minDate(addDays(weekStart, 6), t)).done ? 1 : 0;
   }
   let progress = null;
   if (period === 'month') {
-    const r = status(s, h, minDate(addDays(weekStart, 6), t));
-    progress = isParent(s, h) ? r.ratio : r.minRatio;
+    const asOf = minDate(addDays(weekStart, 6), t);
+    if (isQuota(h)) {
+      const q = quotaStatus(s, h, asOf);
+      progress = Math.min(1, q.met / q.need);
+    } else {
+      const r = status(s, h, asOf);
+      progress = isParent(s, h) ? r.ratio : r.minRatio;
+    }
   }
   return {
-    days, due, done, skipped, period, progress,
+    days, due, done, skipped, period, progress, quota: isQuota(h),
     total: Math.round(total * 100) / 100,
     rate: due ? done / due : null,
   };
@@ -294,12 +345,17 @@ export function goalText(h) {
     max: `At most ${fmt(h.max)} ${u} per ${per}`,
     range: `Between ${fmt(h.min)}–${fmt(h.max)} ${u} per ${per}`,
   }[h.kind] || '';
-  if (h.period === 'day' && h.days && h.days.length && h.days.length < 7) {
-    const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const td = taskDaysOf(h);
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const n = Math.round(h.perCount || 1);
+  if (td === 'weekdays' && h.days?.length && h.days.length < 7) {
     txt += ` on ${h.days.slice().sort().map((d) => names[d]).join(', ')}`;
+  } else if (td === 'monthDays' && h.monthDays?.length) {
+    txt += ` on day ${h.monthDays.slice().sort((a, b) => a - b).join(', ')} of the month`;
+  } else if (isQuota(h)) {
+    txt += `, ${n} day${n > 1 ? 's' : ''} a ${quotaPeriod(h)}`;
   }
   const mode = tapModeOf(h);
-  if (isCheckIn(h)) return `${txt}, check off once a day (extra days count too)`;
   if (mode === 'add') return `${txt}, ${fmt(h.step)} ${h.unit} per tap`;
   return `${txt}, ${mode === 'keypad' ? 'enter amounts on a keypad' : 'one tap marks it done'}`;
 }

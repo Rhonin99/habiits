@@ -4,7 +4,17 @@ A private habit tracker that installs on your iPhone home screen. You don't need
 
 ## Features
 
-- **Habit types:** daily, weekly, or monthly goals with any amount and unit, for example 3 L/day, 3 times/week or 8 times/month. Daily habits can be limited to certain weekdays.
+- **Goals:** each habit has three settings:
+  - **Goal period:** the window the goal is measured over (daily, weekly or monthly).
+  - **Goal value:** any amount and unit, such as 3 L or 30 min.
+  - **Task days:** when it's required:
+    - every day
+    - specific days of the week
+    - a number of days per week
+    - specific days of the month
+    - a number of days per month
+
+  For example, "Workout: 1 time a day, 3 days per week" shows every day with three dots under the check button. A dot fills each day you do it, and missed or skipped days have no effect.
 - **Habit button:** each habit chooses what its button does:
   - **Mark done:** one tap completes the goal; tap again to undo.
   - **Add amount:** each tap adds a set amount, such as 1 L.

@@ -64,7 +64,11 @@ export function newHabit(partial = {}) {
     // what the card's button does: 'done' = complete the goal in one tap,
     // 'add' = add `step`, 'keypad' = pop up a keypad to enter any amount
     tapMode: '',
-    days: [0, 1, 2, 3, 4, 5, 6], // weekdays a daily habit is due (Date.getDay values)
+    // task days: 'every' | 'weekdays' (days) | 'monthDays' (monthDays) | 'perWeek' / 'perMonth' (perCount)
+    taskDays: '',
+    days: [0, 1, 2, 3, 4, 5, 6], // weekdays (Date.getDay values) for 'weekdays'
+    monthDays: [], // 1..31 for 'monthDays'
+    perCount: 3, // days per week/month for 'perWeek' / 'perMonth'
     timeRange: 'any',
     reminder: '',
     source: '', // '', 'steps', 'workout', 'sleep', 'active', 'mindful', 'app:<Name>'
@@ -75,6 +79,7 @@ export function newHabit(partial = {}) {
     ...upgradeGoal(partial),
   };
   if (!h.tapMode) h.tapMode = h.kind === 'min' && h.step >= h.min ? 'done' : 'add';
+  if (!h.taskDays) h.taskDays = h.days?.length && h.days.length < 7 ? 'weekdays' : 'every';
   return h;
 }
 
@@ -102,7 +107,7 @@ function seed() {
     routine,
     newHabit({ name: 'Make bed', emoji: '🛌', color: 'orange', groupId: mind.id, parentId: routine.id, order: o++ }),
     newHabit({ name: 'Meditate', emoji: '🧘', color: 'orange', groupId: mind.id, parentId: routine.id, min: 10, unit: 'min', step: 10, order: o++ }),
-    newHabit({ name: 'Read', emoji: '📚', color: 'green', groupId: mind.id, period: 'week', min: 3, unit: 'times', step: 1, tapMode: 'done', order: o++ }),
+    newHabit({ name: 'Read', emoji: '📚', color: 'green', groupId: mind.id, min: 1, unit: 'times', step: 1, tapMode: 'done', taskDays: 'perWeek', perCount: 3, order: o++ }),
     newHabit({ name: 'Instagram', emoji: '📱', color: 'pink', groupId: digital.id, kind: 'max', max: 30, unit: 'min', step: 5, source: 'app:Instagram', order: o++ }),
     newHabit({ name: 'Gaming', emoji: '🎮', color: 'teal', groupId: digital.id, kind: 'range', min: 20, max: 60, unit: 'min', step: 10, order: o++ }),
   ];
@@ -119,15 +124,21 @@ function migrate(s) {
     habits: (s.habits || []).map((h) => newHabit(h)),
     settings: { ...d.settings, ...(s.settings || {}) },
   };
-  // v4: "N times a week/month" habits become once-a-day check-ins (one time only,
-  // so choosing "Add amount" again later sticks).
-  if (!out.settings.checkInV4) {
+  // v6: "N times a week/month" habits become a daily goal of 1 with task days
+  // "N days per week/month". Runs once, so later edits stick.
+  if (!out.settings.taskDaysV6) {
     out.habits.forEach((h) => {
-      if (h.period !== 'day' && h.kind === 'min' && h.tapMode !== 'keypad' && h.step === 1 && COUNT_UNIT.test(h.unit.trim())) {
+      if (h.period !== 'day' && h.kind === 'min' && h.tapMode !== 'keypad'
+        && (h.tapMode === 'done' || h.step === 1) && COUNT_UNIT.test(h.unit.trim())) {
+        h.taskDays = h.period === 'week' ? 'perWeek' : 'perMonth';
+        h.perCount = Math.min(h.period === 'week' ? 7 : 31, Math.max(1, Math.round(h.min)));
+        h.period = 'day';
+        h.min = 1;
+        h.step = 1;
         h.tapMode = 'done';
       }
     });
-    out.settings.checkInV4 = true;
+    out.settings.taskDaysV6 = true;
   }
   return out;
 }

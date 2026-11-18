@@ -179,10 +179,13 @@ export function buildICS(h) {
   const now = new Date();
   const start = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}T${pad(+hh)}${pad(+mm)}00`;
   let rrule = 'FREQ=DAILY';
-  if (h.period === 'day' && h.days?.length && h.days.length < 7) {
+  const td = h.taskDays || 'every';
+  if (td === 'weekdays' && h.days?.length && h.days.length < 7) {
     rrule = `FREQ=WEEKLY;BYDAY=${h.days.slice().sort().map((d) => DOW_ICS[d]).join(',')}`;
-  } else if (h.period === 'week') rrule = 'FREQ=WEEKLY';
-  else if (h.period === 'month') rrule = 'FREQ=MONTHLY';
+  } else if (td === 'monthDays' && h.monthDays?.length) {
+    rrule = `FREQ=MONTHLY;BYMONTHDAY=${h.monthDays.slice().sort((a, b) => a - b).join(',')}`;
+  } else if (td === 'every' && h.period === 'week') rrule = 'FREQ=WEEKLY';
+  else if (td === 'every' && h.period === 'month') rrule = 'FREQ=MONTHLY';
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
   const clean = (t) => String(t).replace(/[\\,;]/g, (c) => `\\${c}`).replace(/\n/g, ' ');
   return [

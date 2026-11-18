@@ -232,14 +232,19 @@ body.dragging .hcard:not(.lifted) { transition: transform .15s; }
   font-variant-numeric: tabular-nums;
 }
 .hhint { font-size: 12px; color: var(--muted); }
-.wdots { display: inline-flex; gap: 3px; align-items: center; }
-.wdots i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 70%, var(--muted)); }
-.wdots i.on { background: var(--c); border-color: var(--c); }
-.wdots i.cur { outline: 1.5px solid var(--text); outline-offset: 1px; }
-.hcard.done > .hslide .wdots i { border-color: #fff; }
-.hcard.done > .hslide .wdots i.on { background: #fff; }
-.hcard.done > .hslide .wdots i.cur { outline-color: #fff; }
-.htoday { font-weight: 600; color: var(--text); }
+.hbtn-col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.qdots { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 54px; }
+.qdots i { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.qdots i.on { background: #34c759; }
+.qdots i.extra { box-shadow: 0 0 0 1.5px color-mix(in srgb, #34c759 40%, transparent); }
+.hcard.done > .hslide .qdots i { background: rgba(0, 0, 0, .22); }
+.hcard.done > .hslide .qdots i.on { background: #fff; box-shadow: none; }
+.qcount { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mday-picks { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.mday-picks label { position: relative; }
+.mday-picks input { position: absolute; opacity: 0; pointer-events: none; }
+.mday-picks i { display: grid; place-items: center; height: 34px; border-radius: 10px; font-style: normal; font-size: 14px; background: var(--card-2); }
+.mday-picks input:checked + i { background: var(--primary); color: #fff; font-weight: 600; }
 .hside { display: flex; align-items: center; gap: 8px; }
 .hstreak { font-size: 13px; font-weight: 600; white-space: nowrap; }
 

@@ -8,7 +8,7 @@ import {
 } from './store.js';
 import {
   status, streaks, monthStats, dayIntensity, goalText, isParent, childrenOf, topLevel, scaleOf,
-  isScheduled, hasMin,
+  isScheduled, hasMin, isQuota, quotaStatus, quotaPeriod,
 } from './logic.js';
 import {
   openSheet, closeSheet, sheetEl, heatmap, monthGrid, colorOf, icons, toast, ring, scrollHeatmaps,
@@ -23,7 +23,9 @@ const EMOJIS = ['💧', '💪', '🚶', '🏃', '🛏️', '🧘', '📚', '✍�
 export function openEditor(id, preset = {}) {
   const s = getState();
   const existing = id ? getHabit(id) : null;
-  const h = existing ? { ...existing, days: [...existing.days] } : newHabit({ order: Date.now(), ...preset });
+  const h = existing
+    ? { ...existing, days: [...existing.days], monthDays: [...(existing.monthDays || [])] }
+    : newHabit({ order: Date.now(), ...preset });
   const hasKids = existing && isParent(s, existing);
   const parents = topLevel(s, 'all').filter((p) => p.id !== h.id && !p.parentId);
   const src = h.source.startsWith('app:') ? 'app' : h.source;
@@ -62,20 +64,29 @@ export function openEditor(id, preset = {}) {
         <div class="seg">${seg('kind', [['min', '↑ Minimum'], ['max', '↓ Maximum'], ['range', '↕ Min & max']], h.kind)}</div>
         <p class="note" id="kind-help"></p></div>
       <div class="field"><span>Goal period</span>
-        <div class="seg">${seg('period', [['day', 'Daily'], ['week', 'Weekly'], ['month', 'Monthly']], h.period)}</div></div>
+        <div class="seg">${seg('period', [['day', 'Daily'], ['week', 'Weekly'], ['month', 'Monthly']], h.period)}</div>
+        <p class="note">The goal value below is measured per this period.</p></div>
       <div class="field-grid">
         <label id="min-field"><span>Minimum</span><input name="min" inputmode="decimal" value="${num(h.min)}"></label>
         <label id="max-field"><span>Maximum</span><input name="max" inputmode="decimal" value="${num(h.max)}"></label>
         <label><span>Unit</span><input name="unit" list="units" value="${esc(h.unit)}" maxlength="12"></label>
       </div>
+      <label class="field-row"><span>Task days</span>
+        <select name="taskDays" id="task-days"></select></label>
+      <div class="field" id="days-field"><span>Days of the week</span>
+        <div class="dow-picks">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label><input type="checkbox" name="days" value="${d}" ${h.taskDays === 'weekdays' && h.days.includes(d) ? 'checked' : ''}><i>${DOW_SHORT[d]}</i></label>`).join('')}</div></div>
+      <div class="field" id="mdays-field"><span>Days of the month</span>
+        <div class="mday-picks">${Array.from({ length: 31 }, (_, i) => i + 1).map((d) => `<label><input type="checkbox" name="monthDays" value="${d}" ${h.monthDays.includes(d) ? 'checked' : ''}><i>${d}</i></label>`).join('')}</div>
+        <p class="note">Picking 29–31 also covers the last day of shorter months.</p></div>
+      <label class="field-row" id="count-field"><span id="count-label">Days per week</span>
+        <input name="perCount" inputmode="numeric" value="${h.perCount || 3}" style="max-width:80px"></label>
+      <p class="note" id="task-help"></p>
       <div class="field"><span>Habit button</span>
         <div class="seg">${seg('tapMode', [['done', '✓ Check off'], ['add', '＋ Add amount'], ['keypad', '⌨ Keypad']], h.tapMode)}</div>
         <p class="note" id="tap-help"></p>
         <label class="field-row" id="step-field"><span>Amount per tap</span><input name="step" inputmode="decimal" value="${num(h.step)}"></label>
       </div>
       <datalist id="units">${UNITS.map((u) => `<option value="${u}">`).join('')}</datalist>
-      <div class="field" id="days-field" ${h.period === 'day' ? '' : 'hidden'}><span>Days</span>
-        <div class="dow-picks">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label><input type="checkbox" name="days" value="${d}" ${h.days.includes(d) ? 'checked' : ''}><i>${DOW_SHORT[d]}</i></label>`).join('')}</div></div>
       <p class="summary" id="goal-summary"></p>
     </div>
 
@@ -122,8 +133,10 @@ export function openEditor(id, preset = {}) {
     out.max = Math.max(0, parseLooseNumber(f.get('max')) || 0);
     out.unit = (f.get('unit') || '').trim() || 'times';
     out.step = Math.max(0.01, parseLooseNumber(f.get('step')) || 1);
+    out.taskDays = f.get('taskDays') || 'every';
     out.days = f.getAll('days').map(Number);
-    if (!out.days.length) out.days = [0, 1, 2, 3, 4, 5, 6];
+    out.monthDays = f.getAll('monthDays').map(Number);
+    out.perCount = Math.round(parseLooseNumber(f.get('perCount')) || 0);
     out.timeRange = f.get('timeRange');
     out.reminder = f.get('reminder') || '';
     const source = f.get('source');
@@ -136,7 +149,22 @@ export function openEditor(id, preset = {}) {
   const refresh = () => {
     const cur = readForm();
     el.querySelector('#goal-summary').textContent = `*${goalText(cur)}`;
-    el.querySelector('#days-field').hidden = cur.period !== 'day';
+    // task-day choices depend on the goal period (and "N days" needs a minimum)
+    const sel = form.elements.taskDays;
+    const opts = TASK_DAYS.filter(([v]) => (TASK_OK[cur.period] || []).includes(v) && !(cur.kind === 'max' && v.startsWith('per')));
+    const want = opts.some(([v]) => v === (sel.value || h.taskDays)) ? (sel.value || h.taskDays) : 'every';
+    if (sel.dataset.sig !== opts.map((o) => o[0]).join()) {
+      sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+      sel.dataset.sig = opts.map((o) => o[0]).join();
+    }
+    sel.value = want;
+    cur.taskDays = want;
+    el.querySelector('#days-field').hidden = want !== 'weekdays';
+    el.querySelector('#mdays-field').hidden = want !== 'monthDays';
+    el.querySelector('#count-field').hidden = !want.startsWith('per');
+    el.querySelector('#count-label').textContent = want === 'perWeek' ? 'Days per week' : 'Days per month';
+    el.querySelector('#task-help').textContent = TASK_HELP[want] || '';
+    el.querySelector('#goal-summary').textContent = `*${goalText(cur)}`;
     el.querySelector('#min-field').hidden = cur.kind === 'max';
     el.querySelector('#max-field').hidden = cur.kind === 'min';
     el.querySelector('#kind-help').textContent = KIND_HELP[cur.kind];
@@ -198,6 +226,16 @@ export function openEditor(id, preset = {}) {
         if (out.kind === 'min' && out.min <= 0) { toast('Minimum must be more than 0'); return; }
         if (out.kind === 'range' && out.max <= out.min) { toast('Maximum must be bigger than the minimum'); return; }
       }
+      if (out.taskDays === 'weekdays') {
+        if (!out.days.length) { toast('Pick at least one day of the week'); return; }
+        if (out.days.length === 7) out.taskDays = 'every';
+      }
+      if (out.taskDays === 'monthDays' && !out.monthDays.length) { toast('Pick at least one day of the month'); return; }
+      if (out.taskDays !== 'weekdays') out.days = [0, 1, 2, 3, 4, 5, 6];
+      if (out.taskDays.startsWith('per')) {
+        const cap = out.taskDays === 'perWeek' ? 7 : 31;
+        if (out.perCount < 1 || out.perCount > cap) { toast(`Days per ${out.taskDays === 'perWeek' ? 'week' : 'month'} must be 1–${cap}`); return; }
+      }
       if (out.parentId) {
         const p = getHabit(out.parentId);
         if (p && !out.groupId) out.groupId = p.groupId;
@@ -220,6 +258,26 @@ export function openEditor(id, preset = {}) {
 
 const num = (n) => fmtNum(n).replace(/,/g, '');
 
+const TASK_DAYS = [
+  ['every', 'Every day'],
+  ['weekdays', 'Specific days of the week'],
+  ['perWeek', 'Number of days per week'],
+  ['monthDays', 'Specific days of the month'],
+  ['perMonth', 'Number of days per month'],
+];
+const TASK_OK = {
+  day: ['every', 'weekdays', 'perWeek', 'monthDays', 'perMonth'],
+  week: ['every', 'weekdays'],
+  month: ['every', 'weekdays', 'monthDays'],
+};
+const TASK_HELP = {
+  every: 'Shows up and counts every day.',
+  weekdays: 'Only shows up, and only counts, on the days you pick.',
+  monthDays: 'Only shows up, and only counts, on these dates.',
+  perWeek: 'Shows up every day. Meet the daily goal on this many days each week. Days you skip or miss have no effect; the dots under the button fill as you go.',
+  perMonth: 'Shows up every day. Meet the daily goal on this many days each month. Days you skip or miss have no effect.',
+};
+
 const KIND_HELP = {
   min: 'For a habit you want to increase: reach at least the minimum.',
   max: 'For a habit you want to reduce: stay at or under the maximum.',
@@ -227,9 +285,6 @@ const KIND_HELP = {
 };
 
 function tapHelp(h) {
-  if (h.tapMode === 'done' && h.period !== 'day') {
-    return `One tap checks off today (once a day). Each day you do it counts toward the ${num(h.min)} per ${h.period}, and extra days count too.`;
-  }
   if (h.tapMode === 'done') {
     return `One tap completes the goal (fills it up to ${num(h.min)} ${h.unit}). Tap again to undo.`;
   }
@@ -277,6 +332,7 @@ export function openDetail(id, date) {
         <div>
           <div class="big">${parent ? `${st.value}/${st.target}` : `${fmtNum(st.value)}<small>${h.kind === 'range' ? ` · ${fmtNum(h.min)}–${fmtNum(h.max)}` : `/${fmtNum(scaleOf(h))}`} ${esc(h.unit)}</small>`}</div>
           <p class="note">${esc(relativeDayLabel(date))}${h.period !== 'day' && !parent ? ` · ${h.period === 'week' ? 'this week' : 'this month'}` : ''}</p>
+          ${!parent && isQuota(h) ? (() => { const q = quotaStatus(s, h, date); return `<p class="note"><b>${q.met}/${q.need} days</b> ${quotaPeriod(h) === 'week' ? 'this week' : 'this month'}</p>`; })() : ''}
           <p class="note">${parent ? `${childrenOf(s, h.id).length} subhabits` : esc(goalText(h))}</p>
         </div>
       </div>
