@@ -169,18 +169,52 @@ async function pasteSync() {
   try {
     text = await navigator.clipboard.readText();
   } catch (e) {
-    toast('Couldn’t read the clipboard — use “Paste data manually” in Settings.');
-    ui.tab = 'settings';
-    render();
+    // iOS refused (the little "Paste" bubble wasn't tapped) → let the user paste by hand
+    openPasteSheet('iOS didn’t let the app read the clipboard. Long-press the box below, tap <b>Paste</b>, then <b>Import</b>.<br><br>Next time: after tapping Paste in the app, iOS shows a small <b>Paste</b> bubble. Tap that bubble to allow it.');
     return;
   }
   importSyncText(text);
 }
 
+function openPasteSheet(note) {
+  const el = openSheet(`<header class="sheet-head"><span class="icon-btn placeholder"></span><h2>Paste sync data</h2>
+      <button class="icon-btn" data-act="close-sheet" aria-label="Close">✕</button></header>
+    <div class="card">
+      <p class="note">${note}</p>
+      <textarea id="paste-box" rows="7" placeholder="Long-press here → Paste"></textarea>
+      <button class="btn btn-primary wide" id="paste-go">Import</button>
+    </div>`);
+  el.querySelector('#paste-go').onclick = () => importSyncText(el.querySelector('#paste-box').value);
+}
+
+// Nothing usable in the text: show what arrived and the most likely shortcut mistake.
+function syncProblem(text) {
+  const t = String(text || '').trim();
+  let why;
+  if (!t) {
+    why = 'Nothing arrived. The clipboard was empty. In the <b>Habit Sync</b> shortcut, make sure the <b>last</b> action is <b>Copy to Clipboard</b> and that it copies the <b>Text</b> action’s result.';
+  } else if (/\[[^\]]*\]/.test(t) || !/\d/.test(t)) {
+    why = 'The values were typed in as plain text instead of inserted as variables. In the shortcut’s <b>Text</b> action, delete <code>[Steps]</code>, then tap in that spot and pick <b>Steps</b> from the bar above the keyboard. It should appear as a coloured <b>bubble</b>, not as typed text. Do the same for <b>Sleep</b> and for <b>Current Date</b>.';
+  } else {
+    why = 'The text arrived, but no line looks like <code>steps=6421</code>. Each value needs its own line in the form <code>name=number</code>.';
+  }
+  openSheet(`<header class="sheet-head"><span class="icon-btn placeholder"></span><h2>Nothing to import</h2>
+      <button class="icon-btn" data-act="close-sheet" aria-label="Close">✕</button></header>
+    <div class="card">
+      <p>${why}</p>
+      <p class="note" style="margin-top:12px">What the app received:</p>
+      <pre class="sync-preview">${t ? esc(t.slice(0, 800)) : '(empty)'}</pre>
+      <p class="note">It should look like:</p>
+      <pre class="sync-preview">date=2026-11-19
+steps=6421
+sleep=7.4</pre>
+    </div>`);
+}
+
 function importSyncText(text) {
   const parsed = parseSyncText(text);
   const n = Object.keys(parsed.days).length + parsed.events.length;
-  if (!n) { toast('No sync data found in the clipboard'); return; }
+  if (!n) { syncProblem(text); return; }
   const report = applySync(parsed);
   openSheet(`<header class="sheet-head"><span class="icon-btn placeholder"></span><h2>Synced</h2>
       <button class="icon-btn" data-act="close-sheet" aria-label="Close">✕</button></header>

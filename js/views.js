@@ -551,7 +551,7 @@ export function renderSettings(s) {
         <button class="btn" data-act="reset" data-samples="1">Reload sample habits</button>
       </div>
     </section>
-    <p class="note center">Habits · offline web app · v7</p>`;
+    <p class="note center">Habits · offline web app · v8</p>`;
 }
 
 const GUIDES = `

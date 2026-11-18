@@ -417,6 +417,12 @@ summary { font-weight: 600; cursor: pointer; }
 }
 code { background: var(--card-2); padding: 1px 5px; border-radius: 6px; font-size: .9em; }
 .manual { border: 0; padding-bottom: 0; }
+#paste-box { width: 100%; margin: 10px 0; }
+.sync-preview {
+  white-space: pre-wrap; word-break: break-word; margin: 6px 0 10px;
+  padding: 10px 12px; border-radius: 12px; background: var(--card-2);
+  font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 
 /* ---------- sheet ---------- */
 
