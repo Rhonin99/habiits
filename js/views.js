@@ -19,6 +19,7 @@ function groupPill(s, ui) {
 /* ================= TODAY ================= */
 
 export function progressLabel(h, st) {
+  if (st.solo) return st.done ? 'Done' : 'Subhabits skipped';
   if (st.parent) return `${st.value}/${st.target} done`;
   const u = esc(h.unit);
   if (h.kind === 'range') return `${fmtNum(st.value)} · ${fmtNum(h.min)}–${fmtNum(h.max)} ${u}`;
@@ -43,7 +44,10 @@ function quotaDots(q) {
 }
 
 function actionButton(h, st, future) {
-  if (future || st.parent) return '';
+  if (future || (st.parent && !st.solo)) return '';
+  if (st.solo) {
+    return `<button class="hbtn${st.done ? ' hbtn-done' : ''}" data-act="tap" data-id="${h.id}" aria-label="Mark ${esc(h.name)} done">${icons.check}</button>`;
+  }
   const mode = tapModeOf(h);
   let inner = mode === 'done' ? icons.check : mode === 'keypad' ? icons.keypad : icons.plus;
   let cls = 'hbtn';
@@ -551,7 +555,7 @@ export function renderSettings(s) {
         <button class="btn" data-act="reset" data-samples="1">Reload sample habits</button>
       </div>
     </section>
-    <p class="note center">Habits · offline web app · v8</p>`;
+    <p class="note center">Habits · offline web app · v9</p>`;
 }
 
 const GUIDES = `

@@ -94,6 +94,14 @@ function tapHabit(id) {
   const s = getState();
   const st = status(s, h, date);
   if (navigator.vibrate) navigator.vibrate(10);
+  if (st.parent) {
+    // only tappable when every subhabit was skipped
+    if (!st.solo) return;
+    const before = getLog(id, key);
+    setLog(id, key, st.done ? 0 : 1);
+    toast(st.done ? `${h.name} unchecked` : `🎉 ${h.name} done!`, [{ label: 'Undo', fn: () => setLog(id, key, before) }]);
+    return;
+  }
   const mode = tapModeOf(h);
 
   if (mode === 'keypad') {
@@ -140,7 +148,11 @@ function completeAll() {
   const changes = [];
   const visit = (h) => {
     if (!isDue(s, h, date)) return;
-    if (isParent(s, h)) { childrenOf(s, h.id).forEach(visit); return; }
+    if (isParent(s, h)) {
+      if (status(s, h, date).solo) { if (!getLog(h.id, key)) changes.push([h.id, 0, 1]); return; }
+      childrenOf(s, h.id).forEach(visit);
+      return;
+    }
     if (!hasMin(h)) return;
     const missing = h.min - valueAsOf(s, h, date);
     if (missing > 0) changes.push([h.id, getLog(h.id, key), getLog(h.id, key) + missing]);

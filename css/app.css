@@ -402,6 +402,7 @@ body.dragging .hcard:not(.lifted) { transition: transform .15s; }
   min-width: 0; max-width: 60%; text-align: right; border: 0; background: var(--card-2);
   border-radius: 10px; padding: 8px 10px;
 }
+#count-field input, #step-field input { text-align: left; }
 textarea {
   width: 100%; border-radius: 12px; border: 1px solid var(--line); background: var(--card-2);
   padding: 10px; margin: 8px 0; font-family: ui-monospace, Menlo, monospace; font-size: 13px;

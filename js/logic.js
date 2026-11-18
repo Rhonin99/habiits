@@ -92,11 +92,19 @@ export function isSkipped(s, h, date) {
   return !!day && (h.id in day || (!!h.parentId && h.parentId in day));
 }
 
+// A parent whose scheduled subhabits were all skipped (but the parent itself wasn't):
+// it stays on the list and can be checked off or skipped on its own.
+export function kidsAllSkipped(s, h, date) {
+  if (isSkipped(s, h, date)) return false;
+  const kids = childrenOf(s, h.id).filter((k) => isScheduled(s, k, date));
+  return kids.length > 0 && kids.every((k) => isSkipped(s, k, date));
+}
+
 // Counts toward completion and streaks on this date.
 export function isDue(s, h, date) {
   if (isSkipped(s, h, date)) return false;
   const kids = childrenOf(s, h.id);
-  if (kids.length) return kids.some((k) => isDue(s, k, date));
+  if (kids.length) return kids.some((k) => isDue(s, k, date)) || kidsAllSkipped(s, h, date);
   // a "3 days a week" habit only counts on the days you actually did it
   if (isQuota(h)) return isScheduled(s, h, date) && status(s, h, date).done;
   return isScheduled(s, h, date);
@@ -121,6 +129,11 @@ export function metGoal(h, value) {
 export function status(s, h, date) {
   const kids = childrenOf(s, h.id);
   if (kids.length) {
+    if (kidsAllSkipped(s, h, date)) {
+      // checked off directly: stored as a log on the parent for that day
+      const done = (s.logs[h.id]?.[dkey(date)] || 0) > 0;
+      return { parent: true, solo: true, value: done ? 1 : 0, target: 1, ratio: done ? 1 : 0, done, over: false };
+    }
     const due = kids.filter((k) => isDue(s, k, date));
     const doneCount = due.filter((k) => status(s, k, date).done).length;
     return {
