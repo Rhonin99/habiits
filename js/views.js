@@ -551,7 +551,7 @@ export function renderSettings(s) {
         <button class="btn" data-act="reset" data-samples="1">Reload sample habits</button>
       </div>
     </section>
-    <p class="note center">Habits · offline web app · v6</p>`;
+    <p class="note center">Habits · offline web app · v7</p>`;
 }
 
 const GUIDES = `
@@ -566,12 +566,11 @@ const GUIDES = `
   <ol>
     <li>Open <b>Shortcuts</b> → <b>+</b> and name it exactly <b>Habit Sync</b> (or change the name in the field above).</li>
     <li><b>Find Health Samples</b> → Type <b>Steps</b>, Start Date <b>is today</b>. Add <b>Calculate Statistics</b> → <b>Sum</b>. Then <b>Set Variable</b> <code>Steps</code>.</li>
-    <li><b>Find Health Samples</b> → Type <b>Workouts</b>, Start Date <b>is today</b>. Add <b>Get Details of Health Sample</b> → <b>Duration</b>, then <b>Calculate Statistics</b> → <b>Sum</b>. Use <b>Convert Measurement</b> to <b>minutes</b> if needed. <b>Set Variable</b> <code>Workout</code>.</li>
+    <li>(Optional) Workouts: <b>Find Health Samples</b> doesn't offer a Workouts type on current iOS, so skip this step and leave the <code>workout=</code> line out below. Either tick Workout off by hand, or use <b>Active Energy</b> instead: Find Health Samples → Type <b>Active Energy</b>, Start Date <b>is today</b> → <b>Calculate Statistics</b> → <b>Sum</b> → <b>Set Variable</b> <code>Active</code>, and add the line <code>active=[Active]</code>. Then give a habit the data source <b>Active energy</b> with a kcal goal.</li>
     <li><b>Find Health Samples</b> → Type <b>Sleep Analysis</b>, Start Date <b>is in the last 1 day</b>, Value <b>is not In Bed</b> and <b>is not Awake</b>. Get <b>Duration</b>, <b>Sum</b> it, convert to <b>hours</b>. <b>Set Variable</b> <code>Sleep</code>.</li>
     <li>(Optional, for screen time) <b>Get File</b> from <b>Shortcuts</b> folder → path <code>habit-apps.txt</code>, turn off “Error if not found”. <b>Set Variable</b> <code>AppLog</code>.</li>
     <li>Add a <b>Text</b> action with these lines:<pre>date=[Current Date, format yyyy-MM-dd]
 steps=[Steps]
-workout=[Workout]
 sleep=[Sleep]
 [AppLog]</pre></li>
     <li><b>Copy to Clipboard</b> (the Text). Optionally then <b>Delete Files</b> on habit-apps.txt — the app remembers events it has already seen.</li>
