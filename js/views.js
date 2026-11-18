@@ -557,7 +557,7 @@ export function renderSettings(s) {
         <button class="btn" data-act="reset" data-samples="1">Reload sample habits</button>
       </div>
     </section>
-    <p class="note center">Habits · offline web app · v4</p>`;
+    <p class="note center">Habits · offline web app · v5</p>`;
 }
 
 const GUIDES = `
@@ -605,11 +605,12 @@ sleep=[Sleep]
 </details>
 <details><summary>5 · Automatic backups to iCloud Drive</summary>
   <p><b>How it works:</b> a web app can't write to iCloud Drive itself. When a backup is due, the app shows a banner. Tap it and the app copies your data and runs a <b>Habit Backup</b> shortcut, which saves it as a dated file in iCloud Drive. Then switch back to the app.</p>
+  <p><b>Note:</b> Habits won't appear in the Shortcuts app's list of apps. That's normal for a Home Screen web app. The shortcut only uses built-in actions; find each one with the <b>Search Actions</b> bar.</p>
   <ol>
-    <li>In Shortcuts, tap <b>+</b> and name the shortcut <b>Habit Backup</b>.</li>
-    <li>Add <b>Get Clipboard</b>.</li>
-    <li>Add <b>Set Name</b>: set Clipboard's name to <code>habits-[Current Date, format yyyy-MM-dd].json</code>.</li>
-    <li>Add <b>Save File</b>: turn <b>Ask Where to Save</b> off. Set Subpath to <code>/Habit Backups/</code> and turn <b>Overwrite If File Exists</b> on.</li>
+    <li>In Shortcuts, tap <b>+</b>. Tap the name at the top and rename it <b>Habit Backup</b>. The name must match exactly.</li>
+    <li>Search <b>Get Clipboard</b> and tap it.</li>
+    <li>Search <b>Set Name</b> and tap it. It shows “Set name of <i>Clipboard</i> to <i>Name</i>”. Tap <i>Name</i> and type <code>habits-</code>. Above the keyboard, tap <b>Current Date</b>. Tap the inserted Current Date, choose <b>Custom</b> format and enter <code>yyyy-MM-dd</code>. After it, type <code>.json</code>.</li>
+    <li>Search <b>Save File</b> and tap it. It should read “Save <i>Renamed Item</i>”. Tap the <b>›</b> arrow to expand it. Turn <b>Ask Where to Save</b> off, set Subpath to <code>/Habit Backups/</code> and turn <b>Overwrite If File Exists</b> on.</li>
     <li>(Optional) Add <b>Show Notification</b> “Habits backed up ✅”.</li>
   </ol>
   <p>Files land in <b>iCloud Drive → Shortcuts → Habit Backups</b>, one per day you back up. They sync to your other devices and to iCloud.com.</p>
