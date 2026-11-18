@@ -1,0 +1,7 @@
+# Inspiration screenshots of another app — keep them local, don't publish
+app_*.jpeg
+# Local Claude Code settings
+.claude/
+# OS clutter
+Thumbs.db
+.DS_Store
