@@ -1,6 +1,6 @@
 // Offline support: cache the app shell, serve from cache, refresh in the background.
 // Bump VERSION whenever you deploy changes so phones pick up the new files.
-const VERSION = 'habits-v3';
+const VERSION = 'habits-v4';
 const SHELL = [
   './',
   './index.html',

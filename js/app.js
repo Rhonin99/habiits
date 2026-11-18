@@ -4,10 +4,10 @@ import {
   addAnomaly, removeAnomaly, reorderHabits,
 } from './store.js';
 import {
-  today, dkey, parseKey, addDays, addMonths, startOfMonth, startOfWeek, esc, fmtNum, todayKey,
+  today, dkey, parseKey, addDays, addMonths, startOfMonth, startOfWeek, esc, fmtNum, todayKey, relativeDayLabel,
 } from './util.js';
 import {
-  status, isDue, topLevel, childrenOf, isParent, valueAsOf, hasMin, tapModeOf,
+  status, isDue, topLevel, childrenOf, isParent, valueAsOf, hasMin, tapModeOf, isCheckIn,
 } from './logic.js';
 import { renderToday, renderStats, renderHabits, renderSettings } from './views.js';
 import {
@@ -101,6 +101,24 @@ function tapHabit(id) {
     return;
   }
   const before = getLog(id, key);
+  if (isCheckIn(h)) {
+    // once a day: tap checks today off, tap again unchecks it
+    if (before > 0) {
+      setLog(id, key, 0);
+      toast(`${h.name} unchecked for ${relativeDayLabel(date).toLowerCase()}`, [{ label: 'Undo', fn: () => setLog(id, key, before) }]);
+      return;
+    }
+    setLog(id, key, 1);
+    const after = status(getState(), h, date);
+    const per = h.period === 'week' ? 'this week' : 'this month';
+    let msg = `✓ ${h.name} · ${fmtNum(after.value)}/${fmtNum(h.min)} ${per}`;
+    if (after.done && !st.done) msg = `🎉 ${h.name} goal reached ${per}!`;
+    else if (st.done) msg = `✓ ${h.name} · ${fmtNum(after.value)} ${per} (goal ${fmtNum(h.min)})`;
+    const actions = [{ label: 'Undo', fn: () => setLog(id, key, before) }];
+    if (h.shortcut) actions.unshift({ label: 'Send ❤️', fn: () => runShortcut(h.shortcut, 1) });
+    toast(msg, actions);
+    return;
+  }
   if (mode === 'done') {
     if (st.done) {
       // already complete → tap again to undo today's entry
@@ -137,6 +155,10 @@ function completeAll() {
     if (!isDue(s, h, date)) return;
     if (isParent(s, h)) { childrenOf(s, h.id).forEach(visit); return; }
     if (!hasMin(h)) return;
+    if (isCheckIn(h)) {
+      if (!getLog(h.id, key)) changes.push([h.id, 0, 1]);
+      return;
+    }
     const missing = h.min - valueAsOf(s, h, date);
     if (missing > 0) changes.push([h.id, getLog(h.id, key), getLog(h.id, key) + missing]);
   };

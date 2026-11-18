@@ -69,7 +69,7 @@ export function openEditor(id, preset = {}) {
         <label><span>Unit</span><input name="unit" list="units" value="${esc(h.unit)}" maxlength="12"></label>
       </div>
       <div class="field"><span>Habit button</span>
-        <div class="seg">${seg('tapMode', [['done', '✓ Mark done'], ['add', '＋ Add amount'], ['keypad', '⌨ Keypad']], h.tapMode)}</div>
+        <div class="seg">${seg('tapMode', [['done', '✓ Check off'], ['add', '＋ Add amount'], ['keypad', '⌨ Keypad']], h.tapMode)}</div>
         <p class="note" id="tap-help"></p>
         <label class="field-row" id="step-field"><span>Amount per tap</span><input name="step" inputmode="decimal" value="${num(h.step)}"></label>
       </div>
@@ -227,6 +227,9 @@ const KIND_HELP = {
 };
 
 function tapHelp(h) {
+  if (h.tapMode === 'done' && h.period !== 'day') {
+    return `One tap checks off today (once a day). Each day you do it counts toward the ${num(h.min)} per ${h.period}, and extra days count too.`;
+  }
   if (h.tapMode === 'done') {
     return `One tap completes the goal (fills it up to ${num(h.min)} ${h.unit}). Tap again to undo.`;
   }

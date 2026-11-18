@@ -102,21 +102,34 @@ function seed() {
     routine,
     newHabit({ name: 'Make bed', emoji: '🛌', color: 'orange', groupId: mind.id, parentId: routine.id, order: o++ }),
     newHabit({ name: 'Meditate', emoji: '🧘', color: 'orange', groupId: mind.id, parentId: routine.id, min: 10, unit: 'min', step: 10, order: o++ }),
-    newHabit({ name: 'Read', emoji: '📚', color: 'green', groupId: mind.id, period: 'week', min: 3, unit: 'times', step: 1, order: o++ }),
+    newHabit({ name: 'Read', emoji: '📚', color: 'green', groupId: mind.id, period: 'week', min: 3, unit: 'times', step: 1, tapMode: 'done', order: o++ }),
     newHabit({ name: 'Instagram', emoji: '📱', color: 'pink', groupId: digital.id, kind: 'max', max: 30, unit: 'min', step: 5, source: 'app:Instagram', order: o++ }),
     newHabit({ name: 'Gaming', emoji: '🎮', color: 'teal', groupId: digital.id, kind: 'range', min: 20, max: 60, unit: 'min', step: 10, order: o++ }),
   ];
   return s;
 }
 
+const COUNT_UNIT = /^(times?|x|days?|sessions?|workouts?|)$/i;
+
 function migrate(s) {
   const d = defaults();
-  return {
+  const out = {
     ...d,
     ...s,
     habits: (s.habits || []).map((h) => newHabit(h)),
     settings: { ...d.settings, ...(s.settings || {}) },
   };
+  // v4: "N times a week/month" habits become once-a-day check-ins (one time only,
+  // so choosing "Add amount" again later sticks).
+  if (!out.settings.checkInV4) {
+    out.habits.forEach((h) => {
+      if (h.period !== 'day' && h.kind === 'min' && h.tapMode !== 'keypad' && h.step === 1 && COUNT_UNIT.test(h.unit.trim())) {
+        h.tapMode = 'done';
+      }
+    });
+    out.settings.checkInV4 = true;
+  }
+  return out;
 }
 
 export function load() {

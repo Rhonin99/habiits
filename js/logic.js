@@ -29,7 +29,13 @@ export function periodRange(h, date, weekStart) {
   return [date, date];
 }
 
-export const dayValue = (s, h, key) => s.logs[h.id]?.[key] || 0;
+// Weekly/monthly habit with a "Mark done" button = check off once per day, count the days.
+export const isCheckIn = (h) => h.period !== 'day' && tapModeOf(h) === 'done';
+
+export const dayValue = (s, h, key) => {
+  const v = s.logs[h.id]?.[key] || 0;
+  return isCheckIn(h) ? (v > 0 ? 1 : 0) : v;
+};
 
 // Sum of logged values from the start of the habit's period up to and including `date`.
 export function valueAsOf(s, h, date) {
@@ -293,6 +299,7 @@ export function goalText(h) {
     txt += ` on ${h.days.slice().sort().map((d) => names[d]).join(', ')}`;
   }
   const mode = tapModeOf(h);
+  if (isCheckIn(h)) return `${txt}, check off once a day (extra days count too)`;
   if (mode === 'add') return `${txt}, ${fmt(h.step)} ${h.unit} per tap`;
   return `${txt}, ${mode === 'keypad' ? 'enter amounts on a keypad' : 'one tap marks it done'}`;
 }

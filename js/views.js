@@ -4,7 +4,7 @@ import {
 } from './util.js';
 import {
   topLevel, childrenOf, isDue, isScheduled, isSkipped, status, streaks, dayCompletion, monthStats,
-  overallMonth, dayIntensity, goalText, isParent, hasMin, tapModeOf, weekStats,
+  overallMonth, dayIntensity, goalText, isParent, hasMin, tapModeOf, weekStats, isCheckIn, dayValue, periodRange,
 } from './logic.js';
 import { skipReason, isSkippedOn } from './store.js';
 import { ring, heatmap, monthGrid, colorOf, icons } from './components.js';
@@ -35,12 +35,12 @@ function kindHint(h, st) {
   return '';
 }
 
-function actionButton(h, st, future) {
+function actionButton(h, st, future, checkedToday) {
   if (future || st.parent) return '';
   const mode = tapModeOf(h);
   let inner = mode === 'done' ? icons.check : mode === 'keypad' ? icons.keypad : icons.plus;
   let cls = 'hbtn';
-  if (st.done && h.kind === 'min') { inner = icons.check; cls += ' hbtn-done'; }
+  if (checkedToday == null ? st.done && h.kind === 'min' : checkedToday) { inner = icons.check; cls += ' hbtn-done'; }
   return `<button class="${cls}" data-act="tap" data-id="${h.id}" aria-label="Log ${esc(h.name)}">${inner}</button>`;
 }
 
@@ -49,6 +49,7 @@ function sinkFinished(s, list, date) {
   const rank = (h) => {
     if (isSkipped(s, h, date)) return 2;
     const st = status(s, h, date);
+    if (isCheckIn(h) && dayValue(s, h, dkey(date)) > 0) return 1;
     return st.done && h.kind !== 'max' ? 1 : 0;
   };
   return list.map((h, i) => ({ h, i, r: rank(h) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.h);
@@ -71,11 +72,26 @@ function habitCard(s, h, date, ui, future, child = false) {
   const group = !child && h.groupId ? s.groups.find((g) => g.id === h.groupId) : null;
   const streakTxt = !skipped && sk.current > 0 ? `<span class="hstreak">${icons.fire} ${sk.current} ${sk.unit}${sk.current > 1 ? 's' : ''}</span>` : '';
   const reason = skipped ? skipReason(key, h.id) || (h.parentId ? skipReason(key, h.parentId) : null) : null;
-  const meta = skipped
+  let meta = skipped
     ? `<span class="hbadge">Skipped</span>${reason ? `<span class="bubble mini">⚡ ${esc(reason.text)}</span>` : ''}`
     : `<span class="hbadge">${progressLabel(h, st)}</span>${hint ? `<span class="hhint">${hint}</span>` : ''}${kHint ? `<span class="hhint">${kHint}</span>` : ''}`;
   const kidsHtml = kids.length && !collapsed
     ? `<div class="hkids">${sinkFinished(s, kids, date).map((k) => habitCard(s, k, date, ui, future, true)).join('')}</div>` : '';
+  const checkIn = isCheckIn(h) && !st.parent;
+  const checkedToday = checkIn ? dayValue(s, h, key) > 0 : null;
+  if (checkIn && !skipped) {
+    // e.g. "2/3 this week" + which days + whether today is done
+    const per = h.period === 'week' ? 'this week' : 'this month';
+    let dots = '';
+    if (h.period === 'week') {
+      const [start] = periodRange(h, date, s.settings.weekStart);
+      dots = `<span class="wdots" aria-hidden="true">${Array.from({ length: 7 }, (_, i) => {
+        const k = dkey(addDays(start, i));
+        return `<i class="${dayValue(s, h, k) > 0 ? 'on' : ''}${k === key ? ' cur' : ''}"></i>`;
+      }).join('')}</span>`;
+    }
+    meta = `<span class="hbadge">${fmtNum(st.value)}/${fmtNum(h.min)}</span><span class="hhint">${per}</span>${dots}${checkedToday ? '<span class="hhint htoday">✓ today</span>' : ''}`;
+  }
   const directlySkipped = isSkippedOn(key, h.id);
   const noSwipe = future || (skipped && !directlySkipped);
   return `<article class="hcard${doneCls}${kindCls}${child ? ' hchild' : ''}${skipped ? ' skipped' : ''}" style="--c:${color}" data-hid="${h.id}"${noSwipe ? ' data-noswipe="1"' : ''}>
@@ -95,7 +111,7 @@ function habitCard(s, h, date, ui, future, child = false) {
           <div class="hside">
             ${streakTxt}
             ${kids.length ? `<button class="hbtn hbtn-ghost" data-act="toggle-kids" data-id="${h.id}" aria-label="Show subhabits">${collapsed ? icons.down : icons.up}</button>` : ''}
-            ${skipped ? '' : actionButton(h, st, future)}
+            ${skipped ? '' : actionButton(h, st, future, checkedToday)}
           </div>
         </div>
       </div>
@@ -541,7 +557,7 @@ export function renderSettings(s) {
         <button class="btn" data-act="reset" data-samples="1">Reload sample habits</button>
       </div>
     </section>
-    <p class="note center">Habits · offline web app · v3</p>`;
+    <p class="note center">Habits · offline web app · v4</p>`;
 }
 
 const GUIDES = `

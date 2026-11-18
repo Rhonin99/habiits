@@ -232,6 +232,14 @@ body.dragging .hcard:not(.lifted) { transition: transform .15s; }
   font-variant-numeric: tabular-nums;
 }
 .hhint { font-size: 12px; color: var(--muted); }
+.wdots { display: inline-flex; gap: 3px; align-items: center; }
+.wdots i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 70%, var(--muted)); }
+.wdots i.on { background: var(--c); border-color: var(--c); }
+.wdots i.cur { outline: 1.5px solid var(--text); outline-offset: 1px; }
+.hcard.done > .hslide .wdots i { border-color: #fff; }
+.hcard.done > .hslide .wdots i.on { background: #fff; }
+.hcard.done > .hslide .wdots i.cur { outline-color: #fff; }
+.htoday { font-weight: 600; color: var(--text); }
 .hside { display: flex; align-items: center; gap: 8px; }
 .hstreak { font-size: 13px; font-weight: 600; white-space: nowrap; }
 
